@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">VirtualMouse</string>
+    <string name="LeftMouseButton"> </string>
+    <string name="RightMouseButton"> </string>
+    <string name="ExitString">Exit</string>
+    <string name="ConnectString">Connect</string>
+    <string name="DisconnectString">Disconnect</string>
+    <string name="HelpString">Help</string>
+    <string name="HelpInfo">1. Press \'Connect\' icon in menu to connect server.\n
+                            2. Press \'Disconnect\' icon in menu to disconnect from server.\n
+                            3. Press \'Exit\' icon in menu to close application.\n
+    </string>
+    <string name="InputInvitation">Input server IP address and port</string>
+</resources>
