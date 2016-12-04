@@ -15,6 +15,12 @@
         android:orderInCategory="100"
         app:showAsAction="always" />
     <item
+        android:id="@+id/SelectHostPortAction"
+        android:title="@string/SelectHostPortString"
+        android:icon="@drawable/select"
+        android:orderInCategory="100"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/HelpAction"
         android:title="@string/HelpString"
         android:icon="@drawable/help"

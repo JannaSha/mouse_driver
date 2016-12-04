@@ -2,8 +2,8 @@ import socket
 import os
 import threading
 MAX_LISTENERS = 5
-FILE_NAME = '/sys/devices/platform/vms/coordinates'
-# FILE_NAME = 'file.txt'
+# FILE_NAME = '/sys/devices/platform/vms/coordinates'
+FILE_NAME = 'file.txt'
 
 
 def start_server(host, port, stop_event):
@@ -40,4 +40,4 @@ def start_server(host, port, stop_event):
     return 0
 
 if __name__ == '__main__':
-    start_server('localhost', 9000, threading.Event())
+    start_server('10.0.2.15', 9000, threading.Event())

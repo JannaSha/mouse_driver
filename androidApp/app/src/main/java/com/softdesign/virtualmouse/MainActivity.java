@@ -7,52 +7,41 @@ import android.view.Display;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.app.AlertDialog;
-import java.io.BufferedReader;
+
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int MOUSE_MOVE = 7;
+    private static final int MOUSE_DOUBLE_CLICK = 6;
     private static final int MOUSE_LEFT_BUTTON_PRESS = 1;
     private static final int MOUSE_RIGHT_BUTTON_PRESS = 2;
-    private static final int BUFFER_SIZE = 64;
-    private static final int BROADCAST_PORT_NUMBER = 9000;
-    private static final String BROADCAST_IP_ADDRESS = "10.0.2.2";
     private static final int RECEIVE_INTERVAL_MILE_SECONDS = 1000;
-    private static final int UDP_PORT_INDEX = 0;
     private static final int SCREEN_WIDTH_INDEX = 1;
     private static final int SCREEN_HEIGHT_INDEX = 2;
+    private static final int DOUBLE_CLICK_TIME_DELTA = 300;
 
     private Button leftMouseButton, rightMouseButton;
-    private TextView mainTextInfo;
-    private Socket serverSocket = null;
+    private TextView mainTextInfo, hostText, portText;
+    private EditText portEdit, hostEdit;
     private boolean isConnected = false;
 
     int screenWidth = 0, screenHeight = 0;
     double scaleX = 0.0, scaleY = 0.0;
     int mouseX = 0, mouseY = 0;
-    int mouseCommandType = 0;
 
-    private int UdpPortNumber = 0;
-    private int TcpPortNumber = 0;
+    private static Socket serverSocket = null;
+    private static long lastClickTime = 0;
 
-    private DatagramSocket serverDatagramSocket = null;
-    private InetAddress serverAddress = null;
-
-    private static Socket soc = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,80 +49,34 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         mainTextInfo = (TextView) findViewById(R.id.ApplicationInfoText);
-        leftMouseButton = (Button)findViewById(R.id.LeftMouseButton);
-        rightMouseButton = (Button)findViewById(R.id.RightMouseButton);
+        leftMouseButton = (Button) findViewById(R.id.LeftMouseButton);
+        rightMouseButton = (Button) findViewById(R.id.RightMouseButton);
+        hostText = (TextView) findViewById(R.id.hostText);
+        portText = (TextView) findViewById(R.id.portText);
+        hostEdit = (EditText) findViewById(R.id.hostEdit);
+        portEdit = (EditText) findViewById(R.id.portEdit);
 
         leftMouseButton.setOnClickListener(leftButtonClickListener);
         rightMouseButton.setOnClickListener(rightButtonClickListener);
 
-//        leftMouseButton.setVisibility(View.VISIBLE);
-//        rightMouseButton.setVisibility(View.VISIBLE);
+        leftMouseButton.setVisibility(View.INVISIBLE);
+        rightMouseButton.setVisibility(View.INVISIBLE);
+        portText.setVisibility(View.INVISIBLE);
+        portEdit.setVisibility(View.INVISIBLE);
+        hostText.setVisibility(View.INVISIBLE);
+        hostEdit.setVisibility(View.INVISIBLE);
 
         WindowManager windowManager = this.getWindowManager();
         Display display = windowManager.getDefaultDisplay();
         DisplayMetrics metrics = new DisplayMetrics();
         display.getMetrics(metrics);
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    soc = new Socket(BROADCAST_IP_ADDRESS, BROADCAST_PORT_NUMBER);
-                    ShowMessage("OK", "You have connected!");
-                    soc.getOutputStream().write("connected".getBytes());
-                    isConnected = true;
-                } catch (IOException e) {
-                    ShowMessage("Connect exception", e.getMessage());
-                }
-            }
-        }).start();
-
-
+        mainTextInfo.setText("You have to connect");
         screenHeight = metrics.heightPixels;
         screenWidth = metrics.widthPixels;
         scaleX = 900.0 / screenWidth;
         scaleY = 1440.0 / screenHeight;
-
-//        FindServerThread findserverThread = new FindServerThread();
-//        new Thread(findserverThread).start();
     }
-
-//    private void FindServer(){
-//        try {
-//            DatagramSocket findServerSocket = new DatagramSocket();
-//            findServerSocket.setBroadcast(true);
-//
-//            byte[] serverMessage = new byte[BUFFER_SIZE];
-//
-//            // Упаковка сообщения в пакет
-//            DatagramPacket serverAnswer = new DatagramPacket(serverMessage, serverMessage.length);
-//
-//            String message = "New client";
-//            DatagramPacket datagramPacket = new DatagramPacket(message.getBytes(), message.length(),
-//                    InetAddress.getByName(BROADCAST_IP_ADDRESS), BROADCAST_PORT_NUMBER);
-//
-//            findServerSocket.send(datagramPacket);
-//            findServerSocket.setSoTimeout(RECEIVE_INTERVAL_MILE_SECONDS);
-//            // findServerSocket.receive(serverAnswer);
-//
-//            serverAddress = serverAnswer.getAddress();
-//
-//            String portNumberStr = new String(serverAnswer.getData());
-//            portNumberStr = portNumberStr.trim().replaceAll("\n", "");
-//            TcpPortNumber = Integer.parseInt(portNumberStr);
-//
-//            findServerSocket.close();
-//
-//        } catch (SocketException e) {
-//            ShowMessage("Network exception", e.getMessage());
-//        } catch (SocketTimeoutException ex) {
-//            ShowMessage("Find server exception", ex.getMessage());
-//        } catch (UnknownHostException ex) {
-//            ShowMessage("Unknown host", ex.getMessage());
-//        } catch (IOException ex) {
-//            ShowMessage("error!", ex.getMessage());
-//        }
-//    };
 
     View.OnClickListener leftButtonClickListener = new View.OnClickListener() {
         @Override
@@ -155,11 +98,24 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onTouchEvent(MotionEvent motionEvent) {
+        long clickTime = System.currentTimeMillis();
+        SendMouseCommandThread senComThr;
         mouseX = (int)motionEvent.getX();
         mouseY = (int)motionEvent.getY();
-        ShowMessage("Send", mouseX + " " + mouseY);
-        SendMouseCommandThread senComThr = new SendMouseCommandThread(MOUSE_MOVE);
-        new Thread(senComThr).start();
+        if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
+            if (clickTime - lastClickTime < DOUBLE_CLICK_TIME_DELTA)
+                senComThr = new SendMouseCommandThread(MOUSE_DOUBLE_CLICK);
+            else
+                senComThr = new SendMouseCommandThread(MOUSE_MOVE);
+//            showMessage("OK", "DOWN");
+            new Thread(senComThr).start();
+        }
+        else if (motionEvent.getAction() == MotionEvent.ACTION_MOVE) {
+//                showMessage("OK", "Move");
+                senComThr = new SendMouseCommandThread(MOUSE_MOVE);
+                new Thread(senComThr).start();
+        }
+        lastClickTime = clickTime;
         return true;
     }
 
@@ -201,72 +157,94 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         else if (id == R.id.DisconnectAction) {
+            leftMouseButton.setVisibility(View.INVISIBLE);
+            rightMouseButton.setVisibility(View.INVISIBLE);
+            portText.setVisibility(View.INVISIBLE);
+            portEdit.setVisibility(View.INVISIBLE);
+            hostText.setVisibility(View.INVISIBLE);
+            hostEdit.setVisibility(View.INVISIBLE);
             DisconnectThread disconnectThread = new DisconnectThread();
             new Thread(disconnectThread).start();
+            mainTextInfo.setText("You have to connect");
             return true;
         }
         else if (id == R.id.ConnectAction) {
+            portText.setVisibility(View.INVISIBLE);
+            portEdit.setVisibility(View.INVISIBLE);
+            hostText.setVisibility(View.INVISIBLE);
+            hostEdit.setVisibility(View.INVISIBLE);
+            leftMouseButton.setVisibility(View.VISIBLE);
+            rightMouseButton.setVisibility(View.VISIBLE);
             ConnectThread connectThread = new ConnectThread();
             new Thread(connectThread).start();
+            mainTextInfo.setText("Connected");
             return true;
         }
         else if (id == R.id.HelpAction) {
             if (isConnected) {
-                System.out.println("ERROR, you should disconnect first!");
+                showMessage("ERROR", "You should disconnect first!");
             }
             else {
                 leftMouseButton.setVisibility(View.INVISIBLE);
                 rightMouseButton.setVisibility(View.INVISIBLE);
+                portText.setVisibility(View.INVISIBLE);
+                portEdit.setVisibility(View.INVISIBLE);
+                hostText.setVisibility(View.INVISIBLE);
+                hostEdit.setVisibility(View.INVISIBLE);
                 mainTextInfo.setText(R.string.HelpInfo);
                 mainTextInfo.setVisibility(View.VISIBLE);
             }
             return true;
+        }
+        else if (id == R.id.SelectHostPortAction) {
+            if (isConnected) {
+                showMessage("ERROR", "You should disconnect first!");
+            }
+            else {
+                leftMouseButton.setVisibility(View.INVISIBLE);
+                rightMouseButton.setVisibility(View.INVISIBLE);
+                portText.setVisibility(View.VISIBLE);
+                portEdit.setVisibility(View.VISIBLE);
+                hostText.setVisibility(View.VISIBLE);
+                hostEdit.setVisibility(View.VISIBLE);
+                mainTextInfo.setText("Select host and port");
+            }
         }
         return super.onOptionsItemSelected(item);
     }
 
     class ConnectThread implements Runnable {
         public void run() {
-            try {
-                if (isConnected) {
-                    System.out.println("Connect error, You should already benn connected!");
+            if (isConnected) {
+                showMessage("Information", "You should already been connected!");
+            }
+            else {
+                String host = "";
+                Integer port = 0;
+                if (hostEdit.getText().toString().length() > 0
+                        && portEdit.getText().toString().length() > 0) {
+                    try {
+                        host = hostEdit.getText().toString();
+                        port = Integer.valueOf(portEdit.getText().toString());
+                    } catch (TypeNotPresentException ex) {
+                        showMessage("Error", "Incorrect port or host");
+                    }
+                    try {
+                        serverSocket = new Socket();
+                        serverSocket.connect(new InetSocketAddress(host, port), 10000);
+                        showMessage("OK", "You have connected!");
+                        serverSocket.getOutputStream().write("connected".getBytes());
+                        isConnected = true;
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                        showMessage("Error", "Connection error");
+                    }
                 }
-                else {
-//                    serverSocket = new Socket(serverAddress, TcpPortNumber);
-//
-//                    BufferedReader inputStream = new BufferedReader(
-//                            new InputStreamReader(serverSocket.getInputStream()));
-//
-//                    char[] buffer = new char[BUFFER_SIZE];
-//                    inputStream.read(buffer, 0, BUFFER_SIZE);
-//
-//                    String serverData = String.valueOf(buffer);
-//
-//                    String[] stringsArray = serverData.split(" ");
-//                    UdpPortNumber = Integer.parseInt(stringsArray[UDP_PORT_INDEX]);
-//                    scaleX = (double)Double.parseDouble(stringsArray[SCREEN_WIDTH_INDEX])
-//                            / screenWidth;
-//                    scaleY = (double)Double.parseDouble(stringsArray[SCREEN_HEIGHT_INDEX])
-//                            / screenHeight;
-
-
-//                    serverDatagramSocket = new DatagramSocket();
-//                    serverDatagramSocket.setBroadcast(false);
-
-//                    System.out.println("Connection ok!");
-//                    isConnected = true;
-
-                    soc = new Socket(BROADCAST_IP_ADDRESS, BROADCAST_PORT_NUMBER);
-                    ShowMessage("OK", "You have connected!");
-                    soc.getOutputStream().write("connected".getBytes());
-                    isConnected = true;
-                }
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                System.out.println("Connection exception!");
-
+                else
+                    showMessage("Error", "Input port and host");
             }
         }
+
     }
 
     class SendMouseCommandThread implements Runnable {
@@ -280,43 +258,30 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     String mouseCommand = Integer.toString(mouseCommandType) + " " +
                             Integer.toString((int) (mouseX * scaleX)) + " " +
-                            Integer.toString((int) (mouseY * scaleX));
-//                    DatagramPacket datagramPacket = new DatagramPacket(mouseCommand.getBytes(),
-//                            mouseCommand.length(), serverAddress, UdpPortNumber);
-//                    serverDatagramSocket.send(datagramPacket);
-                    soc.getOutputStream().write(mouseCommand.getBytes());
-                    ShowMessage("OK!", "MessageSend!");
+                            Integer.toString((int) (mouseY * scaleX)) + "\n";
+
+                    serverSocket.getOutputStream().write(mouseCommand.getBytes());
                 } catch (Exception ex) {
-                    ShowMessage("Send command exception", ex.getMessage());
+                    showMessage("Send command exception", ex.getMessage());
                 }
             }
         }
     }
 
-//    class FindServerThread implements Runnable {
-//        public void run() {
-//            FindServer();
-//        }
-//    }
 
     class DisconnectThread implements Runnable {
         public void run() {
             try {
-                if (!isConnected) {
-                    ShowMessage("Disconnect error", "You have already been disconnected!");
-                }
+                if (!isConnected)
+                    showMessage("Disconnect error", "You have already been disconnected!");
                 else {
-                    soc.close();
-//                    serverSocket.close();
-//                    serverDatagramSocket.close();
+                    serverSocket.close();
                     isConnected = false;
-                    ShowMessage("Disconnect ok!", "You have been successfully disconnected!");
-                    ShowMainAppInfo();
+                    showMessage("Disconnect ok!", "You have been successfully disconnected!");
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
-                ShowMessage("Disconnect error!", ex.getMessage());
-                ShowMainAppInfo();
+                showMessage("Disconnect error!", ex.getMessage());
             }
         }
     }
@@ -324,40 +289,15 @@ public class MainActivity extends AppCompatActivity {
     class CloseAppThread implements Runnable {
         public void run() {
             try {
-                if (isConnected) {
-//                    serverSocket.close();
-//                    serverDatagramSocket.close();
-                    soc.close();
-                }
+                if (isConnected)
+                    serverSocket.close();
             } catch (Exception ex) {
-                ShowMessage("close all thread exception", ex.getMessage());
+                showMessage("close all thread exception", ex.getMessage());
             }
         }
     }
 
-    public void ShowOnlyControlComponents() {
-        MainActivity.this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                mainTextInfo.setVisibility(View.INVISIBLE);
-                leftMouseButton.setVisibility(View.VISIBLE);
-                rightMouseButton.setVisibility(View.VISIBLE);
-            }
-        });
-    }
-    public void ShowMainAppInfo() {
-        MainActivity.this.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                leftMouseButton.setVisibility(View.VISIBLE);
-                rightMouseButton.setVisibility(View.VISIBLE);
-                mainTextInfo.setText(R.string.app_name);
-                mainTextInfo.setVisibility(View.VISIBLE);
-            }
-        });
-    }
-
-    public void ShowMessage(final String title, final String message) {
+    public void showMessage(final String title, final String message) {
         MainActivity.this.runOnUiThread(new Runnable() {
             public void run() {
                 AlertDialog.Builder dlgAlert  = new AlertDialog.Builder(MainActivity.this);
@@ -369,5 +309,4 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-
 }
