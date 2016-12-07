@@ -17,7 +17,6 @@ import android.app.AlertDialog;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -74,8 +73,8 @@ public class MainActivity extends AppCompatActivity {
         mainTextInfo.setText("You have to connect");
         screenHeight = metrics.heightPixels;
         screenWidth = metrics.widthPixels;
-        scaleX = 900.0 / screenWidth;
-        scaleY = 1440.0 / screenHeight;
+        scaleX = 800.0 / screenWidth;
+        scaleY = 600.0 / screenHeight;
     }
 
     View.OnClickListener leftButtonClickListener = new View.OnClickListener() {
@@ -233,7 +232,7 @@ public class MainActivity extends AppCompatActivity {
                         serverSocket = new Socket();
                         serverSocket.connect(new InetSocketAddress(host, port), 10000);
                         showMessage("OK", "You have connected!");
-                        serverSocket.getOutputStream().write("connected".getBytes());
+//                        serverSocket.getOutputStream().write("connected".getBytes());
                         isConnected = true;
                     } catch (IOException ex) {
                         ex.printStackTrace();
@@ -256,9 +255,13 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             if (isConnected) {
                 try {
+//                    String mouseCommand = Integer.toString(mouseCommandType) + " " +
+//                            Integer.toString((int) (mouseX * scaleX)) + " " +
+//                            Integer.toString((int) (mouseY * scaleX)) + "\n";
+//
                     String mouseCommand = Integer.toString(mouseCommandType) + " " +
-                            Integer.toString((int) (mouseX * scaleX)) + " " +
-                            Integer.toString((int) (mouseY * scaleX)) + "\n";
+                            Integer.toString((mouseX)) + " " +
+                            Integer.toString((mouseY)) + "\n";
 
                     serverSocket.getOutputStream().write(mouseCommand.getBytes());
                 } catch (Exception ex) {

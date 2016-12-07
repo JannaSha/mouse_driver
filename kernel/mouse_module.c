@@ -154,15 +154,17 @@ static int __init display_init(void)
 
 
     vms_input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REL); //| BIT_MASK(EV_REL);
+    // vms_input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS); //| BIT_MASK(EV_REL);
+
     vms_input_dev->relbit[0] = BIT_MASK(REL_X) | BIT_MASK(REL_Y);
     vms_input_dev->keybit[BIT_WORD(BTN_MOUSE)] = BIT_MASK(BTN_LEFT) | BIT_MASK(BTN_RIGHT) | BIT_MASK(BTN_MIDDLE);
     // vms_input_dev->relbit[0] = BIT_MASK(REL_X) | BIT_MASK(REL_Y);
     vms_input_dev->keybit[BIT_WORD(BTN_MOUSE)] |= BIT_MASK(BTN_SIDE) |  BIT_MASK(BTN_EXTRA);
     //  vms_input_dev->relbit[0] |= BIT_MASK(REL_WHEEL);
-    //vms_input_dev->absbit[0] = BIT_MASK(ABS_X) | BIT_MASK(ABS_Y);
+    // vms_input_dev->absbit[0] = BIT_MASK(ABS_X) | BIT_MASK(ABS_Y);
 
-  //   input_set_abs_params(vms_input_dev, ABS_X, 0, 0, 0, 0);
-  //   input_set_abs_params(vms_input_dev, ABS_Y, 0, 0, 0, 0);
+    // input_set_abs_params(vms_input_dev, ABS_X, 0, 0, 0, 0);
+    // input_set_abs_params(vms_input_dev, ABS_Y, 0, 0, 0, 0);
 
     // vms_input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REL);
     // vms_input_dev->relbit[0] = BIT_MASK(REL_X) | BIT_MASK(REL_Y);
